@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="33T-Box" />
+  <link rel="icon" type="image/jpeg" href="/logo.jpg" />
+  <link rel="apple-touch-icon" href="/logo.jpg" />
+  <title>33T-Box — Collections Vinyles & CD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body { background-color: #0b1120; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+    @media screen and (max-width: 768px) {
+      input, select, textarea { font-size: 16px !important; }
+    }
+    .vinyl-groove {
+      background: repeating-radial-gradient(#111 0, #111 2px, #222 3px, #111 4px);
+    }
+    .cd-shine {
+      background: conic-gradient(from 45deg, #cbd5e1, #64748b, #e2e8f0, #38bdf8, #94a3b8, #cbd5e1);
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0b1120" />
+</head>
+<body class="min-h-screen flex flex-col pb-20">
+
+  <!-- ÉCRAN DE VERROUILLAGE PRIV� (SI NON IDENTIFIÉ ET SANS TOKEN D'INVITATION) -->
+  <div id="private-lock-screen" class="hidden fixed inset-0 bg-[#0b1120] z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 space-y-5 shadow-2xl text-center">
+      <img src="/logo.jpg" onerror="this.src='/logo.svg'" alt="33T-Box" class="w-16 h-16 rounded-2xl object-cover border border-amber-500/60 mx-auto shadow-lg" />
+      <div>
+        <h2 class="text-xl font-extrabold text-white"><span class="text-amber-500">33T</span>-Box · Accès Privé</h2>
+        <p class="text-xs text-slate-400 mt-1">Cette collection est privée. Connecte-toi avec ton compte membre ou utilise ton lien d'invitation.</p>
+      </div>
+      <form onsubmit="submitLockLogin(event)" class="space-y-3 text-left">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Identifiant membre</label>
+          <input type="text" id="lock-slug" required autocomplete="username" placeholder="Ex: alex"
+            class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Mot de passe</label>
+          <input type="password" id="lock-password" required autocomplete="current-password" placeholder="••••••••"
+            class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none" />
+        </div>
+        <button type="submit" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-lg text-sm shadow transition">
+          Accéder aux collections
+        </button>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- BARRE DE NAVIGATION RESPONSIVE AVEC SÉLECTEUR D'ESPACE (MULTI-USER) -->
+  <header class="bg-slate-900/95 backdrop-blur border-b border-slate-800 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+
+      <!-- Logo, Titre & Sélecteur d'Espace -->
+      <div class="flex items-center gap-2.5">
+        <img src="/logo.jpg" onerror="this.src='/logo.svg'" alt="33T-Box" class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-cover border border-amber-500/60 shadow-lg" />
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 id="app-title" class="text-base sm:text-lg font-extrabold tracking-tight">
+              <span class="text-amber-500">33T</span><span class="text-white">-Box</span>
+            </h1>
+            <!-- Menu déroulant pour changer d'espace (Collection d'Alex, Famille, Amis...) -->
+            <select id="space-selector" onchange="switchSpace(this.value)"
+              class="bg-slate-950 border border-amber-500/40 text-amber-300 font-bold text-xs sm:text-sm rounded-lg px-2.5 py-1 focus:outline-none focus:border-amber-400">
+            </select>
+          </div>
+          <div class="flex items-center gap-1.5 mt-0.5">
+            <span id="role-badge" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 inline-block">
+              Mode Consultation
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions Utilisateur / Ajout / Login -->
+      <div class="flex items-center gap-2 order-2 sm:order-3">
+        <button id="btn-add-vinyl" onclick="openVinylModal()" class="hidden bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs sm:text-sm transition shadow">
+          + Ajouter
+        </button>
+        <button id="btn-login" onclick="openLoginModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm border border-slate-700 transition">
+          Connexion
+        </button>
+        <button id="btn-logout" onclick="logoutUser()" class="hidden bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800/60 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm transition">
+          Déconnexion
+        </button>
+      </div>
+
+      <!-- Onglets -->
+      <nav class="w-full sm:w-auto order-3 sm:order-2 flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800 overflow-x-auto no-scrollbar">
+        <button onclick="switchTab('collection')" id="tab-collection" class="tab-btn flex-1 sm:flex-initial whitespace-nowrap px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition">
+          Disques <span id="badge-count-col" class="ml-1 text-[11px] opacity-75"></span>
+        </button>
+        <button onclick="switchTab('wishlist')" id="tab-wishlist" class="tab-btn flex-1 sm:flex-initial whitespace-nowrap px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition">
+          Wishlist <span id="badge-count-wish" class="ml-1 text-[11px] opacity-75"></span>
+        </button>
+        <button onclick="switchTab('wall')" id="tab-wall" class="tab-btn flex-1 sm:flex-initial whitespace-nowrap px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition">
+          Mur d'Expo
+        </button>
+        <button onclick="switchTab('stats')" id="tab-stats" class="tab-btn flex-1 sm:flex-initial whitespace-nowrap px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition">
+          Budget & Stats
+        </button>
+        <button onclick="switchTab('users')" id="tab-users" class="tab-btn hidden flex-1 sm:flex-initial whitespace-nowrap px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition text-sky-400">
+          Membres
+        </button>
+        <button onclick="switchTab('settings')" id="tab-settings" class="tab-btn hidden flex-1 sm:flex-initial whitespace-nowrap px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition text-amber-400">
+          Paramètres
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- CONTENU PRINCIPAL -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-4 py-4 sm:py-6">
+
+    <!-- VUE 1 & 2 : COLLECTION & WISHLIST (VINYLES & CD) -->
+    <section id="view-vinyls" class="space-y-4">
+      <div class="bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-800 space-y-3">
+        <div class="flex flex-col lg:flex-row gap-2.5 items-stretch lg:items-center justify-between">
+
+          <!-- Filtre segmenté Support : Tous | Vinyles | CD -->
+          <div class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 self-start sm:self-auto">
+            <button onclick="setMediaFilter('all')" id="media-btn-all" class="px-3 py-1.5 rounded-md text-xs font-bold bg-amber-500 text-slate-950 transition">
+              Tous
+            </button>
+            <button onclick="setMediaFilter('vinyl')" id="media-btn-vinyl" class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-300 hover:text-white transition">
+              ⚫ Vinyles
+            </button>
+            <button onclick="setMediaFilter('cd')" id="media-btn-cd" class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-300 hover:text-white transition">
+              💿 CD
+            </button>
+          </div>
+
+          <!-- Recherche (Artiste, Album, Chanson dans Tracklist, Label) -->
+          <div class="flex-1 flex gap-2 items-center">
+            <div class="flex-1 relative">
+              <input id="search-input" type="text" oninput="renderVinyls()" placeholder="Rechercher un artiste, album, chanson, code-barres..."
+                class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-3.5 pr-8 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+              <button onclick="clearSearchInput()" class="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 text-xs">✕</button>
+            </div>
+            <button type="button" onclick="togglePublicBarcodeScanner()" title="Scanner un code-barres pour vérifier si le disque est dans la base"
+              class="bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 px-3 py-2 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition flex items-center gap-1.5">
+              📷 <span class="hidden sm:inline">Vérifier EAN</span>
+            </button>
+          </div>
+
+          <!-- Filtre Genre, Tri et Sélection multiple -->
+          <div class="flex flex-wrap gap-2 items-center">
+            <select id="filter-genre" onchange="renderVinyls()" class="flex-1 sm:flex-initial bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-300">
+              <option value="">Tous les genres</option>
+            </select>
+            <select id="sort-by" onchange="renderVinyls()" class="flex-1 sm:flex-initial bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-300">
+              <option value="artist">Trier par Artiste</option>
+              <option value="year_desc">Année (Récent → Ancien)</option>
+              <option value="year_asc">Année (Ancien → Récent)</option>
+              <option value="price_desc">Prix (Décroissant)</option>
+              <option value="recent">Ajoutés récemment</option>
+            </select>
+            <button id="btn-toggle-select" onclick="toggleSelectionMode()" class="hidden bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition">
+              ☑ Sélectionner / Régénérer
+            </button>
+          </div>
+        </div>
+
+        <!-- Barre d'actions Sélection Multiple & Régénération (Pochettes + Tracklist + Extraits Deezer) -->
+        <div id="bulk-toolbar" class="hidden pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="selectMissingCoversOrTracks()" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 px-2.5 py-1.5 rounded-lg text-xs font-medium">
+              ⚡ Cocher sans pochette / sans audio Deezer
+            </button>
+            <button onclick="selectAllVisible()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-lg text-xs">
+              Tout cocher
+            </button>
+            <button onclick="clearSelection()" class="bg-slate-800 hover:bg-slate-700 text-slate-400 px-2.5 py-1.5 rounded-lg text-xs">
+              Tout décocher
+            </button>
+            <span id="selected-count-label" class="text-xs text-slate-400 ml-1">0 sélectionné(s)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="runBulkRegenerate()" id="btn-run-regen" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3.5 py-1.5 rounded-lg text-xs sm:text-sm shadow transition">
+              🔄 Régénérer Pochettes, Pistes & Deezer
+            </button>
+          </div>
+        </div>
+
+        <!-- Barre de progression -->
+        <div id="regen-progress-box" class="hidden pt-2 space-y-1.5">
+          <div class="flex justify-between text-xs text-amber-300">
+            <span id="regen-status-text">Mise à jour en cours...</span>
+            <span id="regen-status-pct">0%</span>
+          </div>
+          <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+            <div id="regen-progress-bar" class="h-full bg-amber-500 transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      
+        <!-- Scanner Code-Barres Public (Vérification Collection / Wishlist sans connexion) -->
+        <div id="public-scanner-box" class="hidden pt-3 border-t border-slate-800 space-y-2">
+          <div class="flex items-center justify-between text-xs text-amber-300">
+            <span>📷 Vise le code-barres au dos du disque pour vérifier sa présence :</span>
+            <button type="button" onclick="stopPublicBarcodeScanner()" class="text-slate-400 hover:text-white font-bold">Fermer ✕</button>
+          </div>
+          <div id="public-reader" class="max-w-sm mx-auto rounded-xl overflow-hidden border border-slate-700"></div>
+        </div>
+        <div id="public-scan-result" class="hidden p-3 rounded-xl border text-xs sm:text-sm flex items-center justify-between gap-2"></div>
+  
+      <!-- Grille de vignettes responsive -->
+      <div id="vinyls-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4"></div>
+    </section>
+
+    <!-- VUE 3 : MUR D'EXPOSITION -->
+    <section id="view-wall" class="hidden space-y-5">
+      <div class="bg-slate-900 p-4 sm:p-5 rounded-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-white">Mur d'Exposition</h2>
+          <p class="text-xs sm:text-sm text-slate-400">Clique sur un cadre pour écouter/voir le disque ou choisir visuellement l'album à exposer.</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 bg-slate-950 px-3.5 py-2.5 rounded-xl border border-slate-800">
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400">Hauteur (Lignes) :</label>
+            <select id="wall-rows-direct" onchange="updateWallDimensionsDirect()" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-sm text-amber-400 font-bold">
+              <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option>
+            </select>
+          </div>
+          <span class="text-slate-600">×</span>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400">Largeur (Colonnes) :</label>
+            <select id="wall-cols-direct" onchange="updateWallDimensionsDirect()" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-sm text-amber-400 font-bold">
+              <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
+            </select>
+          </div>
+          <span id="wall-total-frames" class="text-xs text-slate-500 ml-1"></span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto pb-2">
+        <div id="wall-matrix" class="grid gap-4 sm:gap-6 justify-items-center bg-slate-950/90 p-4 sm:p-8 rounded-2xl border border-slate-800 shadow-inner min-w-[300px]"></div>
+      </div>
+    </section>
+
+    <!-- VUE 4 : BUDGET & STATISTIQUES (AVEC RÉPARTITION VINYLES VS CD) -->
+    <section id="view-stats" class="hidden space-y-6">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" id="stats-kpi"></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+        <div class="bg-slate-900 p-4 sm:p-5 rounded-xl border border-slate-800">
+          <h3 class="font-bold text-white mb-4 text-sm sm:text-base">Répartition par Genres (Collection)</h3>
+          <div id="stats-genres" class="space-y-2.5 text-xs sm:text-sm"></div>
+        </div>
+        <div class="bg-slate-900 p-4 sm:p-5 rounded-xl border border-slate-800">
+          <h3 class="font-bold text-white mb-4 text-sm sm:text-base">Répartition par Genres (Wishlist)</h3>
+          <div id="stats-wishlist-genres" class="space-y-2.5 text-xs sm:text-sm"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VUE 5 : GESTION DES MEMBRES / ESPACES (RÉSERVÉ À ALEX SUPER-ADMIN) -->
+    <section id="view-users" class="hidden max-w-4xl mx-auto space-y-6">
+      <div class="bg-slate-900 p-5 sm:p-6 rounded-xl border border-slate-800 space-y-4">
+        <div class="border-b border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-bold text-white">Gestion des Espaces (Famille & Amis)</h2>
+            <p class="text-xs sm:text-sm text-slate-400">Chaque membre dispose de sa propre base SQLite indépendante (<code class="text-amber-400">data/collections/&lt;identifiant&gt;.db</code>).</p>
+          </div>
+        </div>
+
+        <!-- Formulaire création d'un nouvel espace par Alex -->
+        <form onsubmit="createNewMemberSpace(event)" class="bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Prénom / Nom affiché *</label>
+            <input type="text" id="new-user-name" required placeholder="Ex: Lucas, Caro, Gégé..."
+              class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Identifiant (slug) *</label>
+            <input type="text" id="new-user-slug" required placeholder="Ex: lucas, caro, gege"
+              class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Mot de passe *</label>
+            <input type="text" id="new-user-pass" required placeholder="Mot de passe initial"
+              class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+          </div>
+          <div>
+            <button type="submit" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition shadow">
+              + Créer l'espace
+            </button>
+          </div>
+        </form>
+
+        <!-- Liste des espaces existants -->
+        <div id="users-list-container" class="divide-y divide-slate-800"></div>
+      </div>
+
+      <!-- Gestion des Liens d'Invitation (Accès lecture sans mot de passe via Token) -->
+      <div class="bg-slate-900 p-5 sm:p-6 rounded-xl border border-slate-800 space-y-4">
+        <div class="border-b border-slate-800 pb-3">
+          <h2 class="text-lg font-bold text-white">🔗 Liens d'Invitation (Famille & Amis)</h2>
+          <p class="text-xs sm:text-sm text-slate-400">Partage un lien unique avec token : tes proches accèdent directement en lecture seule (et au scan EAN) sans mot de passe.</p>
+        </div>
+        <form onsubmit="createInviteLink(event)" class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+          <div class="flex flex-col sm:flex-row gap-3 items-end">
+            <div class="flex-1 w-full">
+              <label class="block text-xs text-slate-400 mb-1">Nom du lien / Destinataire</label>
+              <input type="text" id="new-invite-label" required placeholder="Ex: Famille, Amis, Noël 2026..."
+                class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+            </div>
+            <button type="submit" class="w-full sm:w-auto bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition shadow whitespace-nowrap">
+              + Générer un lien privé
+            </button>
+          </div>
+          <div>
+            <span class="block text-xs text-slate-400 mb-1.5">Bases accessibles avec ce lien :</span>
+            <div id="invite-spaces-checkboxes" class="flex flex-wrap gap-2"></div>
+          </div>
+        </form>
+        <div id="invites-list-container" class="divide-y divide-slate-800"></div>
+      </div>
+  
+    </section>
+
+    <!-- VUE 6 : PARAMÈTRES DE L'ESPACE COURANT -->
+    <section id="view-settings" class="hidden max-w-2xl mx-auto space-y-6">
+
+      <!-- Partage de ma collection par lien privé (Membres & Admin) -->
+      <div id="member-invites-section" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">🔗 Partager mon espace en lecture seule</h3>
+          <p class="text-xs text-slate-400 mt-1">Génère un lien privé sans mot de passe donnant uniquement accès à ta propre collection et ta wishlist (avec scanner EAN chez le disquaire).</p>
+        </div>
+        <form onsubmit="createMemberInviteLink(event)" class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-3 items-end">
+          <div class="flex-1 w-full">
+            <label class="block text-xs text-slate-400 mb-1">Destinataire / Libellé du lien</label>
+            <input type="text" id="member-invite-label" required placeholder="Ex: Famille, Anniversaire, Noël..."
+              class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+          </div>
+          <button type="submit" class="w-full sm:w-auto bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition shadow whitespace-nowrap">
+            + Créer mon lien de partage
+          </button>
+        </form>
+        <div id="member-invites-list" class="divide-y divide-slate-800"></div>
+      </div>
+
+      <div class="bg-slate-900 p-5 sm:p-6 rounded-xl border border-slate-800 space-y-5">
+        <div class="border-b border-slate-800 pb-3">
+          <h2 class="text-lg font-bold text-white">Paramètres de l'espace</h2>
+          <p class="text-xs sm:text-sm text-slate-400">Personnalise le nom de ta collection, la taille de ton mur et ton mot de passe.</p>
+        </div>
+
+        <form onsubmit="saveSettings(event)" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Titre de cet espace</label>
+            <input type="text" id="set-title" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+          </div>
+
+          <div id="superadmin-discogs-box" class="hidden">
+            <label class="block text-sm font-medium text-slate-300 mb-1">Clé / Token Discogs API (Global serveur)</label>
+            <input type="password" id="set-discogs" placeholder="Token personnel OU ConsumerKey:ConsumerSecret"
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono" />
+            <p class="text-xs text-slate-500 mt-1">Partagé pour les recherches de tous les espaces (avec Deezer et iTunes HD).</p>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs sm:text-sm font-medium text-slate-300 mb-1">Lignes Mur</label>
+              <input type="number" min="1" max="10" id="set-rows" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label class="block text-xs sm:text-sm font-medium text-slate-300 mb-1">Colonnes Mur</label>
+              <input type="number" min="1" max="10" id="set-cols" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+            </div>
+            <div>
+              <label class="block text-xs sm:text-sm font-medium text-slate-300 mb-1">Devise</label>
+              <input type="text" id="set-currency" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Nouveau mot de passe (laisser vide pour ne pas changer)</label>
+            <input type="password" id="set-password" placeholder="••••••••"
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+          </div>
+
+          <div class="pt-3 flex flex-wrap items-center justify-between gap-2">
+            <button type="button" onclick="downloadBackup()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-sm border border-slate-700 transition">
+              Exporter Backup JSON
+            </button>
+            <button type="submit" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-5 py-2 rounded-lg text-sm transition">
+              Enregistrer
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MINI-LECTEUR AUDIO DEEZER FIXE EN BAS D'ÉCRAN -->
+  <div id="deezer-player-bar" class="fixed bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur-md border-t border-amber-500/40 px-3 sm:px-6 py-2.5 z-40 hidden shadow-2xl">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <img id="dz-bar-cover" src="/logo.jpg" referrerpolicy="no-referrer" class="w-10 h-10 rounded-lg object-cover border border-slate-700 flex-shrink-0" />
+        <div class="min-w-0">
+          <div id="dz-bar-title" class="text-xs sm:text-sm font-bold text-white truncate">Titre en cours</div>
+          <div id="dz-bar-artist" class="text-[11px] text-amber-400 truncate">Artiste</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <audio id="dz-audio-element" controls class="h-8 w-44 sm:w-64"></audio>
+        <a id="dz-bar-app-link" href="#" target="_blank" rel="noopener"
+          class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap shadow flex items-center gap-1">
+          🎧 Ouvrir dans Deezer
+        </a>
+        <button onclick="closeDeezerPlayerBar()" class="text-slate-400 hover:text-white text-lg px-1.5">&times;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALE CONNEXION MULTI-USER -->
+  <div id="modal-login" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+      <h3 class="text-lg font-bold text-white">Connexion à ton Espace</h3>
+      <p class="text-xs text-slate-400">Choisis ton profil et saisis ton mot de passe pour gérer tes disques.</p>
+      <form onsubmit="submitLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Membre</label>
+          <input type="text" id="login-slug" required placeholder="Identifiant (ex: alex)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Mot de passe</label>
+          <input type="password" id="login-password" placeholder="Mot de passe" required
+            class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none" />
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="closeLoginModal()" class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:bg-slate-800">Annuler</button>
+          <button type="submit" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm">Se connecter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODALE FICHE DISQUE (VINYLE OU CD) EN 2 COLONNES AVEC LECTEUR DEEZER -->
+  <div id="modal-vinyl" class="fixed inset-0 bg-black/85 hidden items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-5xl w-full p-4 sm:p-6 my-auto max-h-[94vh] overflow-y-auto shadow-2xl">
+      <!-- En-tête de modale -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+        <div class="flex items-center gap-2 min-w-0 flex-wrap">
+          <h3 id="vinyl-modal-title" class="text-base sm:text-lg font-bold text-white truncate">Fiche Disque</h3>
+          <span id="vinyl-modal-media-pill" class="text-xs px-2.5 py-0.5 rounded-full font-bold"></span>
+          <span id="vinyl-modal-status-pill" class="text-xs px-2.5 py-0.5 rounded-full font-semibold"></span>
+        </div>
+        <button onclick="closeVinylModal()" class="text-slate-400 hover:text-white text-2xl leading-none px-2">&times;</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-5 sm:gap-6">
+
+        <!-- COLONNE GAUCHE : POCHETTE HD + BOUTONS DEEZER ALBUM + TRACKLIST AUDIO -->
+        <div class="md:col-span-5 flex flex-col gap-4">
+          <div class="relative aspect-square w-full max-w-[320px] mx-auto bg-slate-950 rounded-xl border border-slate-800 overflow-hidden shadow-xl flex items-center justify-center">
+            <img id="v-preview-img" src="" alt="Pochette" referrerpolicy="no-referrer" class="w-full h-full object-cover hidden" />
+            <div id="v-preview-placeholder" class="w-32 h-32 rounded-full vinyl-groove border border-slate-700 flex items-center justify-center">
+              <div class="w-8 h-8 rounded-full bg-amber-500"></div>
+            </div>
+          </div>
+
+          <!-- Bouton d'ouverture de l'album complet dans l'application Deezer + copie vers mon espace -->
+          <div class="flex flex-wrap justify-center gap-2">
+            <button type="button" onclick="openAlbumInDeezer()" class="bg-purple-600/90 hover:bg-purple-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold shadow flex items-center gap-1.5 transition">
+              🎧 Écouter l'album dans Deezer
+            </button>
+            <button type="button" id="btn-copy-to-my-space" onclick="copyCurrentVinylToMySpace()" class="hidden bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition">
+              + Copier dans ma Wishlist
+            </button>
+          </div>
+
+          <!-- Outils Admin Image -->
+          <div id="v-cover-admin-tools" class="hidden flex flex-wrap justify-center gap-2">
+            <button type="button" onclick="searchCoverAlternatives()" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium">
+              🖼️ Chercher pochette
+            </button>
+            <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium">
+              📁 Importer image
+              <input type="file" id="v-file-upload" accept="image/*" onchange="handleLocalCoverUpload(event)" class="hidden" />
+            </label>
+            <button type="button" onclick="toggleBarcodeScanner()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium">
+              📷 Scan EAN
+            </button>
+          </div>
+
+          <!-- Sélecteur visuel de pochettes -->
+          <div id="v-cover-picker" class="hidden bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>Clique sur une pochette :</span>
+              <button type="button" onclick="document.getElementById('v-cover-picker').classList.add('hidden')" class="text-slate-500 hover:text-white">Fermer</button>
+            </div>
+            <div id="v-cover-picker-grid" class="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto"></div>
+          </div>
+
+          <!-- Scanner Code-barres -->
+          <div id="scanner-container" class="hidden bg-slate-950 p-2 rounded-xl border border-slate-800">
+            <div id="reader" class="w-full rounded-lg overflow-hidden"></div>
+          </div>
+
+          <!-- TRACKLIST INTERACTIVE AVEC BOUTON PLAY DEEZER SUR CHAQUE MORCEAU -->
+          <div class="bg-slate-950 rounded-xl border border-slate-800 p-3.5 flex-1 flex flex-col">
+            <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-800/80">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400">🎵 Pistes & Écoute Deezer</h4>
+              <button type="button" id="btn-add-track-row" onclick="addTrackPrompt()" class="hidden text-xs text-amber-400 hover:underline">+ Ajouter un titre</button>
+            </div>
+            <div id="v-tracklist-view" class="space-y-1.5 max-h-64 overflow-y-auto text-xs pr-1"></div>
+          </div>
+        </div>
+
+        <!-- COLONNE DROITE : DÉTAILS CONSULTATION OU FORMULAIRE ÉDITION -->
+        <div class="md:col-span-7 flex flex-col justify-between">
+
+          <!-- MODE CONSULTATION -->
+          <div id="vinyl-readonly-details" class="hidden space-y-4">
+            <div>
+              <div id="ro-artist" class="text-sm font-bold text-amber-400 uppercase tracking-wide"></div>
+              <h2 id="ro-title" class="text-2xl font-extrabold text-white mt-0.5"></h2>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs">
+              <div><span class="text-slate-500 block">Support</span><span id="ro-media" class="font-bold text-white text-sm"></span></div>
+              <div><span class="text-slate-500 block">Année sortie</span><span id="ro-year" class="font-semibold text-white text-sm"></span></div>
+              <div><span class="text-slate-500 block">Année pressage</span><span id="ro-release-year" class="font-semibold text-white text-sm"></span></div>
+              <div><span class="text-slate-500 block">Genre</span><span id="ro-genre" class="font-semibold text-amber-300 text-sm"></span></div>
+              <div><span class="text-slate-500 block">Format / Édition</span><span id="ro-format" class="font-semibold text-white text-sm"></span></div>
+              <div><span class="text-slate-500 block">Label</span><span id="ro-label" class="font-semibold text-white text-sm"></span></div>
+              <div><span class="text-slate-500 block">État (Média / Pochette)</span><span id="ro-cond" class="font-semibold text-emerald-400 text-sm"></span></div>
+              <div><span class="text-slate-500 block">Prix / Valeur</span><span id="ro-price" class="font-semibold text-amber-400 text-sm"></span></div>
+              <div><span class="text-slate-500 block">Provenance / Statut</span><span id="ro-location" class="font-semibold text-white text-sm"></span></div>
+            </div>
+
+            <div id="ro-notes-box" class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <span class="text-xs text-slate-500 block mb-1">Notes & Remarques</span>
+              <p id="ro-notes" class="text-sm text-slate-200 whitespace-pre-line"></p>
+            </div>
+
+            <div class="pt-4 flex justify-end">
+              <button type="button" onclick="closeVinylModal()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2 rounded-lg text-sm">Fermer</button>
+            </div>
+          </div>
+
+          <!-- MODE ÉDITION (PROPRIÉTAIRE DE L'ESPACE OU SUPER-ADMIN) -->
+          <form id="vinyl-form" onsubmit="saveVinyl(event)" class="space-y-3.5">
+            <input type="hidden" id="v-id" />
+            <input type="hidden" id="v-cover-base64" />
+            <input type="hidden" id="v-discogs-id" />
+            <input type="hidden" id="v-deezer-album-id" />
+
+            <!-- Bandeau bascule rapide Wishlist -> Collection -->
+            <div id="wishlist-acquire-banner" class="hidden bg-emerald-950/60 border border-emerald-700/60 p-3 rounded-xl flex items-center justify-between gap-2">
+              <div class="text-xs text-emerald-200">
+                Ce disque est dans ta <strong>Wishlist</strong>. Tu l'as acheté ?
+              </div>
+              <button type="button" onclick="switchModalVinylToCollection()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs whitespace-nowrap shadow">
+                ✓ Basculer dans ma Collection
+              </button>
+            </div>
+
+            <!-- Choix du Support (Vinyle / CD) + Statut -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Type de support *</label>
+                <select id="v-media-type" onchange="onMediaTypeChange()" class="w-full bg-slate-950 border border-amber-500/40 rounded-lg px-3 py-2 text-sm text-amber-300 font-bold">
+                  <option value="vinyl">⚫ Vinyle (33T / 45T)</option>
+                  <option value="cd">💿 CD Audio</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Statut</label>
+                <select id="v-status" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white">
+                  <option value="collection">Dans ma Collection</option>
+                  <option value="wishlist">Dans ma Wishlist (À acheter)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Artiste & Titre avec Auto-complétion directe -->
+            <div class="relative">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Artiste * <span class="text-[10px] text-amber-400">(auto-recherche)</span></label>
+                  <input type="text" id="v-artist" required oninput="scheduleAutoComplete()" autocomplete="off"
+                    placeholder="Ex: Pink Floyd, Dire Straits..."
+                    class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Titre de l'album * <span class="text-[10px] text-amber-400">(auto-recherche)</span></label>
+                  <div class="flex gap-1.5">
+                    <input type="text" id="v-title" required oninput="scheduleAutoComplete()" autocomplete="off"
+                      placeholder="Ex: Brothers in Arms..."
+                      class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 focus:outline-none" />
+                    <button type="button" onclick="triggerManualLookup()" title="Rechercher dans Discogs, Deezer & iTunes"
+                      class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2.5 rounded-lg text-xs">
+                      🔍
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div id="autocomplete-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-amber-500/50 rounded-xl shadow-2xl z-40 max-h-60 overflow-y-auto divide-y divide-slate-800/80"></div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Genre / Style</label>
+                <input type="text" id="v-genre" placeholder="Rock, Pop, Jazz, Démo Hi-Fi..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Format / Édition</label>
+                <input type="text" id="v-format" value='LP 12" 33T' class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Année sortie</label>
+                  <input type="number" id="v-year" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Année pressage</label>
+                  <input type="number" id="v-release-year" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Label</label>
+                  <input type="text" id="v-label" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Code-barres (EAN)</label>
+                  <input type="text" id="v-barcode" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">État Disque</label>
+                  <select id="v-cond-media" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="M">Mint (M)</option>
+                    <option value="NM" selected>Near Mint (NM)</option>
+                    <option value="VG+">Very Good+ (VG+)</option>
+                    <option value="VG">Very Good (VG)</option>
+                    <option value="G">Good (G)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">État Pochette / Boîtier</label>
+                  <select id="v-cond-sleeve" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="M">Mint (M)</option>
+                    <option value="NM" selected>Near Mint (NM)</option>
+                    <option value="VG+">Very Good+ (VG+)</option>
+                    <option value="VG">Very Good (VG)</option>
+                    <option value="G">Good (G)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Prix (€)</label>
+                  <input type="number" step="0.01" id="v-price" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Lieu / Statut d'achat</label>
+                  <input type="text" id="v-location" placeholder="Disquaire, Fnac, Brocante..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Cadre Mur d'Expo</label>
+                  <select id="v-wall-slot" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="">Non exposé</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">URL Pochette HD</label>
+                  <input type="text" id="v-cover-url" oninput="previewCoverUrlInput()" placeholder="https://..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Notes personnelles</label>
+              <textarea id="v-notes" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white"></textarea>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-800">
+              <div class="flex gap-2">
+                <button type="button" id="btn-delete-vinyl" onclick="deleteCurrentVinyl()" class="hidden bg-rose-950 hover:bg-rose-900 text-rose-300 px-3.5 py-2 rounded-lg text-xs sm:text-sm">
+                  Supprimer
+                </button>
+                <button type="button" id="btn-regen-single" onclick="regenerateSingleModalVinyl()" class="hidden bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 px-3.5 py-2 rounded-lg text-xs sm:text-sm">
+                  🔄 Régénérer API & Deezer
+                </button>
+              </div>
+              <div class="flex gap-2 ml-auto">
+                <button type="button" onclick="closeVinylModal()" class="px-4 py-2 rounded-lg text-xs sm:text-sm text-slate-400 hover:bg-slate-800">Annuler</button>
+                <button type="submit" id="btn-save-vinyl" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-5 py-2 rounded-lg text-xs sm:text-sm shadow">
+                  Enregistrer
+                </button>
+              </div>
+            </div>
+          </form>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALE SÉLECTEUR VISUEL POUR LE MUR D'EXPOSITION -->
+  <div id="modal-wall-picker" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-5 space-y-4 max-h-[85vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 id="wall-picker-title" class="text-base font-bold text-white">Choisir le disque à exposer</h3>
+        <button onclick="closeWallPickerModal()" class="text-slate-400 hover:text-white text-xl">&times;</button>
+      </div>
+      <div class="flex gap-2">
+        <input type="text" id="wall-picker-search" oninput="renderWallPickerList()" placeholder="Filtrer par artiste ou titre..."
+          class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white" />
+        <button onclick="clearWallSlotFromPicker()" class="bg-rose-950/70 hover:bg-rose-900 text-rose-300 px-3 py-2 rounded-lg text-xs font-medium">
+          Libérer ce cadre
+        </button>
+      </div>
+      <div id="wall-picker-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto p-1 flex-1"></div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=13"></script>
+</body>
+</html>

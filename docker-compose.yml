@@ -1,0 +1,13 @@
+services:
+  33t-box:
+    build: .
+    container_name: 33t-box
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - ./covers:/app/covers
+    environment:
+      - NODE_ENV=production
+      - PORT=3000

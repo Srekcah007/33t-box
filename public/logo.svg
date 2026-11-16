@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="42" fill="#0b1120"/>
+  <circle cx="100" cy="100" r="82" fill="none" stroke="#f59e0b" stroke-width="3" opacity="0.85"/>
+  <circle cx="100" cy="100" r="72" fill="none" stroke="#d97706" stroke-width="1.5" opacity="0.6"/>
+  <circle cx="100" cy="100" r="62" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0.5"/>
+  <circle cx="100" cy="100" r="52" fill="none" stroke="#d97706" stroke-width="1.5" opacity="0.4"/>
+  <polygon points="100,28 65,62 100,118 135,62" fill="#f59e0b" stroke="#fde68a" stroke-width="2"/>
+  <polygon points="100,28 82,62 100,118 118,62" fill="#fbbf24" opacity="0.7"/>
+  <line x1="65" y1="62" x2="135" y2="62" stroke="#0b1120" stroke-width="2"/>
+  <rect x="24" y="132" width="152" height="36" rx="8" fill="#0b1120" opacity="0.92"/>
+  <text x="100" y="157" font-family="system-ui, sans-serif" font-size="28" font-weight="800" text-anchor="middle">
+    <tspan fill="#f59e0b">33T</tspan><tspan fill="#f8fafc">-Box</tspan>
+  </text>
+</svg>
